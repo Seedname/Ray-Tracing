@@ -83,23 +83,29 @@ function setup() {
     createCanvas(600, 600);
 
     var objects = [];
-    objects.push(new Sphere(250, 300, 250, 20, [255, 0, 0], [255, 0, 0], 0.5));
+    objects.push(new Sphere(250, 300, 250, 20, [255, 0, 0], [255, 0, 0], 1));
     objects.push(new Sphere(300, 300, 200, 50, [0, 0, 0], [255, 255, 255], 1));
     
     var fov = 10;
 
-    loadPixels(); 
-    for (let x = 0; x < width; x++) {
-      for (let y = 0; y < height; y++) {
-        var ray = new Ray(x-width/2, y, 0, random(-fov/2, fov/2), random(-fov/2, fov/2));
-        var clr = ray.trace(objects);
-        let index = (x + y * width) * 4; 
-        pixels[index] =     255*clr.x;
-        pixels[index + 1] = 255*clr.y;
-        pixels[index + 2] = 255*clr.z;
-        pixels[index + 3] = 255;
-      }
+    let i = 0;
+    while (i < 8) {
+        print(true);
+        loadPixels(); 
+        for (let x = 0; x < width; x++) {
+            for (let y = 0; y < height; y++) {
+                var ray = new Ray(x-width/2, y, 0, random(-fov/2, fov/2), random(-fov/2, fov/2));
+                var clr = ray.trace(objects);
+                let index = (x + y * width) * 4; 
+                let prevAverage = (i+1) * pixels[index];
+                pixels[index] =     (prevAverage + 255*clr.x) / (i + 2);
+                pixels[index + 1] = (prevAverage + 255*clr.y) / (i + 2);
+                pixels[index + 2] = (prevAverage + 255*clr.z) / (i + 2);
+                pixels[index + 3] = 255;
+            }
+        }
+        updatePixels(); 
+        i ++;
     }
-    updatePixels(); 
 }
 
