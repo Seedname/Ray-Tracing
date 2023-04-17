@@ -1,40 +1,88 @@
+function randomPointOnUnitSphere() {
+    let theta = Math.random() * 2 * Math.PI;
+    let phi = Math.acos(2 * Math.random() - 1);
+    return createVector(Math.sin(phi) * Math.cos(theta), Math.sin(phi) * Math.sin(theta), Math.cos(phi));
+  }
+
 class Material {
-    constructor(color, emitColor, strength) {
+    constructor(color, emitColor, strength, specular) {
         this.color = createVector((color[0])/255, (color[1])/255, (color[2])/255);
         this.emitColor = createVector((emitColor[0])/255, (emitColor[1])/255, (emitColor[2])/255);
         this.strength = strength;
+        this.specular = specular;
     }
 }
   
 class Sphere {
-    constructor(x, y, z, r, color, emitColor, strength) {
+    constructor(x, y, z, r, color, emitColor, strength, specular) {
         this.pos = createVector(x, y, z);
         this.r = r;
-        this.material = new Material(color, emitColor, strength);
+        this.material = new Material(color, emitColor, strength, specular);
     }
 
     collide(pos, dir) {
         var p = p5.Vector.sub(pos, this.pos);
         var a = dir.dot(dir);
         var b = 2 * p.dot(dir);
-        var c = p.dot(p) - this.r*this.r;
-    
+        var c = p.dot(p) - this.r * this.r;
         var radicand = b * b - 4 * a * c;
         if (radicand >= 0) {
-            var dst = (-b - Math.sqrt(radicand)) / (2 * a);
-            if (dst >= 0) {
-                let hit = p5.Vector.add(pos, p5.Vector(dir, dst));
-                return [dst, hit, p5.Vector.sub(hit, this.pos).normalize()];
-            }
+          var dst = (-b - Math.sqrt(radicand)) / (2 * a);
+          if (dst >= 0) {
+            let hit = p5.Vector.add(pos, p5.Vector.mult(dir, dst));
+            return [dst, hit, p5.Vector.sub(hit, this.pos).normalize()];
+          }
+        }
+      }
+}
+
+class Triangle {
+    constructor(x1, y1, z1, x2, y2, z2, x3, y3, z3, color, emitColor, strength, specular) {
+        this.a = createVector(x1, y1, z1);
+        this.b = createVector(x2, y2, z2);
+        this.c = createVector(x3, y3, z3);
+        this.material = new Material(color, emitColor, strength, specular);
+    }
+    
+    collide(pos, dir) {
+        const EPSILON = 0.000001;
+        const edge1 = p5.Vector.sub(this.b, this.a);
+        const edge2 = p5.Vector.sub(this.c, this.a);
+        const h = p5.Vector.cross(dir, edge2);
+        const det = edge1.dot(h);
+    
+        if (det > -EPSILON && det < EPSILON) {
+            return;
+        }
+    
+        const invDet = 1.0 / det;
+        const s = p5.Vector.sub(pos, this.a);
+        const u = s.dot(h) * invDet;
+    
+        if (u < 0 || u > 1) {
+            return;
+        }
+    
+        const q = p5.Vector.cross(s, edge1);
+        const v = dir.dot(q) * invDet;
+    
+        if (v < 0 || u + v > 1) {
+            return;
+        }
+    
+        const t = edge2.dot(q) * invDet;
+    
+        if (t > EPSILON) {
+            const intersectionPoint = p5.Vector.add(pos, p5.Vector.mult(dir, t));
+            const normal = p5.Vector.cross(edge1, edge2).normalize();
+            return [t, intersectionPoint, normal]
         }
     }
 }
-
 class Ray {
-    constructor(x, y, z, angle1, angle2) {
+    constructor(x, y, z, dx, dy, dz) {
         this.pos = createVector(x, y, z);
-        this.dir = createVector(cos(radians(angle1)), sin(radians(angle2)), 1);
-        this.dir.normalize();
+        this.dir = createVector(dx, dy, dz);
     }
 
     collide(objects) {
@@ -53,59 +101,121 @@ class Ray {
     trace(objects) {
         var light = createVector(0, 0, 0);
         var rayColor = createVector(1, 1, 1);
-
         for (let i = 0; i < 3; i++) {
-            let collision = this.collide(objects);
-            if (collision) {
-                var c = collision[0];
-                this.pos.set(c[1]);
-                let normal = c[2];
-                this.dir.add(normal);
+          let collision = this.collide(objects);
+          if (collision) {
+            var c = collision[0];
+            this.pos.set(c[1]);
+            let normal = c[2];
+            let material = collision[1];
+            let lightStrength = 1;
+            if (material.specular) {
+                let incoming_ray = this.dir.copy();
+                let dot_product = incoming_ray.dot(normal);
+                let scaled_normal = p5.Vector.mult(normal, 2 * dot_product);
+                this.dir.set(p5.Vector.sub(incoming_ray, scaled_normal));
                 this.dir.normalize();
-
-                let material = collision[1];
-                let emitted = p5.Vector.mult(material.emitColor, material.strength);
-                light.add(p5.Vector.mult(emitted, rayColor));
-                rayColor.mult(material.color);
             } else {
-                break;
+                let randomDir;
+                do {
+                randomDir = randomPointOnUnitSphere();
+                } while (p5.Vector.dot(randomDir, normal) < 0);
+                lightStrength = p5.Vector.dot(normal, randomDir);
+                this.dir.set(randomDir);
+                this.dir.normalize();
             }
-        } 
-        return light;
-    }
-}
-
-function preload() {
-
-}
-
-function setup() {
-    createCanvas(600, 600);
-
-    var objects = [];
-    objects.push(new Sphere(250, 300, 250, 20, [255, 0, 0], [255, 0, 0], 1));
-    objects.push(new Sphere(300, 300, 200, 50, [0, 0, 0], [255, 255, 255], 1));
-    
-    var fov = 10;
-
-    let i = 0;
-    while (i < 8) {
-        print(true);
-        loadPixels(); 
-        for (let x = 0; x < width; x++) {
-            for (let y = 0; y < height; y++) {
-                var ray = new Ray(x-width/2, y, 0, random(-fov/2, fov/2), random(-fov/2, fov/2));
-                var clr = ray.trace(objects);
-                let index = (x + y * width) * 4; 
-                let prevAverage = (i+1) * pixels[index];
-                pixels[index] =     (prevAverage + 255*clr.x) / (i + 2);
-                pixels[index + 1] = (prevAverage + 255*clr.y) / (i + 2);
-                pixels[index + 2] = (prevAverage + 255*clr.z) / (i + 2);
-                pixels[index + 3] = 255;
-            }
+            
+            let emitted = p5.Vector.mult(material.emitColor, material.strength);
+            light.add(p5.Vector.mult(emitted, rayColor));
+            rayColor.mult(material.color);
+            rayColor.mult(lightStrength * 2);
+          } else {
+            break;
+          }
         }
-        updatePixels(); 
-        i ++;
-    }
+        return light;
+      }
 }
 
+
+let accumulatedColors;
+let samplesPerPixel;
+
+var objects = [];
+
+
+function drawWall(x, y, z, w, h, objects) {
+    objects.push(new Triangle(x, y, z, x+w, y+h, z,  x+w, y, z, [0, 0, 255], [0,0,255], 0, false));
+    objects.push(new Triangle(x, y, z, x, y+h, z, x+w, y+h, z, [0, 0, 255], [0,0,255], 0, false));
+}
+
+let p = 0;
+function setup() {
+    createCanvas(200, 200);
+    pixelDensity(1);
+    accumulatedColors = new Array(width * height * 3).fill(0);
+    samplesPerPixel = new Array(width * height).fill(0);
+    objects.push(new Sphere(2, -5, 10000, 4, [0,255,255], [0, 0, 0], 0, false));
+    objects.push(new Sphere(-0.5, -1.25, 10000-3, 1.5, [255,0,255], [0, 0, 0], 0, false));
+
+    // objects.push(new Sphere(1, 1, 10000, 1, [255,0,0], [0, 0, 0], 0, false));
+    // objects.push(new Sphere(0.5, 0.5, 10000, 0.5, [0,255,0], [0, 0, 0], 0, false));
+    // objects.push(new Sphere(1.5, 0.5, 10000, 0.5, [0,255,0], [0, 0, 0], 0, true));
+    let z = 10000+5;
+    // let scale = 1;
+    // objects.push(new Triangle(0, 0, z+1, 1, 1, z, -1, 0, z, [255, 0, 0], [255,255,255], 1, false));
+    drawWall(-5, -5, z, 10, 10, objects);
+    objects.push(new Sphere(0, 7, 10000-5, 5, [0,0,0], [255, 255, 129], 6, false));
+ 
+//   objects.push(new Sphere(-2, -2, 10000, 0.8, [0,255,255], [255, 255, 0], 1, false));
+//   objects.push(new Sphere(1, 2, 10000, 0.8, [255,255,255], [255, 0, 0], 4, false));
+//   objects.push(new Sphere(1, -2, 10000, 1, [255,255,255], [255, 0, 0], 0, true));
+}
+
+function draw() {
+    background(0);
+    
+    var fov = 70;
+    let aspectRatio = width / height;
+    let cameraPos = createVector(0, 0, -3000);
+    let cameraDir = createVector(0, 0, 0);
+    let focalLength = (0.5 * width) / Math.tan((fov / 2) * Math.PI / 180); 
+    // let focalLength = 11;
+    loadPixels();
+    for (let x = 0; x < width; x += 1) {
+        for (let y = 0; y < height; y += 1) {
+            let normalizedX = (x + 0.5) / width;
+            let normalizedY = (y + 0.5) / height;
+            let screenX = 2 * normalizedX - 1;
+            let screenY = 1 - 2 * normalizedY;
+            let cameraX = screenX * Math.tan(fov / 2 * Math.PI / 180) * aspectRatio;
+            let cameraY = screenY * Math.tan(fov / 2 * Math.PI / 180);
+ 
+            let rayDir = createVector(cameraX, cameraY, -focalLength);
+            // rayDir.add(cameraPos);
+            // rayDir.rotate(cameraDir);
+            rayDir.sub(cameraPos);
+            rayDir.normalize();
+            // let rayDir = createVector(cameraX, cameraY, -focalLength);
+            // rayDir.sub(cameraPos);
+            // rayDir.normalize();
+        
+            var ray = new Ray(cameraPos.x, cameraPos.y, cameraPos.z, rayDir.x, rayDir.y, rayDir.z);
+            var clr = ray.trace(objects);
+            let index = x + y * width;
+
+            accumulatedColors[index * 3] += clr.x;
+            accumulatedColors[index * 3 + 1] += clr.y;
+            accumulatedColors[index * 3 + 2] += clr.z;
+            samplesPerPixel[index]++;
+
+            let avgColor = [accumulatedColors[index * 3] / samplesPerPixel[index], accumulatedColors[index * 3 + 1] / samplesPerPixel[index], accumulatedColors[index * 3 + 2] / samplesPerPixel[index]];
+
+            let pixelIndex = index * 4;
+            pixels[pixelIndex] = 255 * avgColor[0];
+            pixels[pixelIndex + 1] = 255 * avgColor[1];
+            pixels[pixelIndex + 2] = 255 * avgColor[2];
+        }
+    }
+    updatePixels();
+}
