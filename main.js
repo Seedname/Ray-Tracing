@@ -5,19 +5,19 @@ function randomPointOnUnitSphere() {
   }
 
 class Material {
-    constructor(color, emitColor, strength, specular) {
+    constructor(color, emitColor, strength, smoothness) {
         this.color = createVector((color[0])/255, (color[1])/255, (color[2])/255);
         this.emitColor = createVector((emitColor[0])/255, (emitColor[1])/255, (emitColor[2])/255);
         this.strength = strength;
-        this.specular = specular;
+        this.smoothness = smoothness;
     }
 }
   
 class Sphere {
-    constructor(x, y, z, r, color, emitColor, strength, specular) {
+    constructor(x, y, z, r, color, emitColor, strength, smoothness) {
         this.pos = createVector(x, y, z);
         this.r = r;
-        this.material = new Material(color, emitColor, strength, specular);
+        this.material = new Material(color, emitColor, strength, smoothness);
     }
 
     collide(pos, dir) {
@@ -37,11 +37,11 @@ class Sphere {
 }
 
 class Triangle {
-    constructor(x1, y1, z1, x2, y2, z2, x3, y3, z3, color, emitColor, strength, specular) {
+    constructor(x1, y1, z1, x2, y2, z2, x3, y3, z3, color, emitColor, strength, smoothness) {
         this.a = createVector(x1, y1, z1);
         this.b = createVector(x2, y2, z2);
         this.c = createVector(x3, y3, z3);
-        this.material = new Material(color, emitColor, strength, specular);
+        this.material = new Material(color, emitColor, strength, smoothness);
     }
     
     collide(pos, dir) {
@@ -109,21 +109,25 @@ class Ray {
             let normal = c[2];
             let material = collision[1];
             let lightStrength = 1;
-            if (material.specular) {
-                let incoming_ray = this.dir.copy();
-                let dot_product = incoming_ray.dot(normal);
-                let scaled_normal = p5.Vector.mult(normal, 2 * dot_product);
-                this.dir.set(p5.Vector.sub(incoming_ray, scaled_normal));
-                this.dir.normalize();
-            } else {
-                let randomDir;
-                do {
-                randomDir = randomPointOnUnitSphere();
-                } while (p5.Vector.dot(randomDir, normal) < 0);
-                lightStrength = p5.Vector.dot(normal, randomDir);
-                this.dir.set(randomDir);
-                this.dir.normalize();
-            }
+            // if (material.specular) {
+            let incoming_ray = this.dir.copy();
+            let dot_product = incoming_ray.dot(normal);
+            let scaled_normal = p5.Vector.mult(normal, 2 * dot_product);
+            let specularRay = p5.Vector.sub(incoming_ray, scaled_normal).normalize();
+            // this.dir.set(p5.Vector.sub(incoming_ray, scaled_normal));
+            // this.dir.normalize();
+            // } else {
+            let randomDir;
+            do {
+            randomDir = randomPointOnUnitSphere();
+            } while (p5.Vector.dot(randomDir, normal) < 0);
+            lightStrength = p5.Vector.dot(normal, randomDir);
+            let refractedRay = randomDir.normalize();
+            
+            this.dir.set(lerp(specularRay.x, refractedRay.x, material.smoothness), lerp(specularRay.y, refractedRay.y, material.smoothness), lerp(specularRay.z, refractedRay.z, material.smoothness));
+            // this.dir.set(randomDir);
+            // this.dir.normalize();
+            // }
             
             let emitted = p5.Vector.mult(material.emitColor, material.strength);
             light.add(p5.Vector.mult(emitted, rayColor));
@@ -145,8 +149,8 @@ var objects = [];
 
 
 function drawWall(x, y, z, w, h, objects) {
-    objects.push(new Triangle(x, y, z, x+w, y+h, z,  x+w, y, z, [0, 0, 255], [0,0,255], 0, false));
-    objects.push(new Triangle(x, y, z, x, y+h, z, x+w, y+h, z, [0, 0, 255], [0,0,255], 0, false));
+    objects.push(new Triangle(x, y, z, x+w, y+h, z,  x+w, y, z, [0, 0, 255], [0,0,255], 0, 1));
+    objects.push(new Triangle(x, y, z, x, y+h, z, x+w, y+h, z, [0, 0, 255], [0,0,255], 0, 1));
 }
 
 let p = 0;
@@ -155,17 +159,17 @@ function setup() {
     pixelDensity(1);
     accumulatedColors = new Array(width * height * 3).fill(0);
     samplesPerPixel = new Array(width * height).fill(0);
-    objects.push(new Sphere(2, -5, 10000, 4, [0,255,255], [0, 0, 0], 0, false));
-    objects.push(new Sphere(-0.5, -1.25, 10000-3, 1.5, [255,0,255], [0, 0, 0], 0, false));
+    objects.push(new Sphere(2, -5, 10000, 4, [0,255,255], [0, 255, 255], 0, 0.8));
+    objects.push(new Sphere(-0.5, -1.25, 10000-3, 1.5, [255,0,255], [255, 0, 255], 0, 1));
 
-    // objects.push(new Sphere(1, 1, 10000, 1, [255,0,0], [0, 0, 0], 0, false));
-    // objects.push(new Sphere(0.5, 0.5, 10000, 0.5, [0,255,0], [0, 0, 0], 0, false));
-    // objects.push(new Sphere(1.5, 0.5, 10000, 0.5, [0,255,0], [0, 0, 0], 0, true));
+    objects.push(new Sphere(-1.6, 0.6, 10000-4, 1, [255,0,0], [255, 0, 0], 0, 1));
+    // objects.push(new Sphere(0.5, 0.5, 10000, 0.5, [0,255,0], [0, 0, 0], 0, 1));
+    // objects.push(new Sphere(1.5, 0.5, 10000, 0.5, [0,255,0], [0, 0, 0], 0, 1));
     let z = 10000+5;
     // let scale = 1;
     // objects.push(new Triangle(0, 0, z+1, 1, 1, z, -1, 0, z, [255, 0, 0], [255,255,255], 1, false));
-    drawWall(-5, -5, z, 10, 10, objects);
-    objects.push(new Sphere(0, 7, 10000-5, 5, [0,0,0], [255, 255, 129], 6, false));
+    // drawWall(-5, -5, z, 10, 10, objects);
+    objects.push(new Sphere(0, 9, 10000-5, 5, [0,0,0], [255, 255, 255], 6, 1));
  
 //   objects.push(new Sphere(-2, -2, 10000, 0.8, [0,255,255], [255, 255, 0], 1, false));
 //   objects.push(new Sphere(1, 2, 10000, 0.8, [255,255,255], [255, 0, 0], 4, false));
@@ -218,4 +222,9 @@ function draw() {
         }
     }
     updatePixels();
+    smooth();
+    let a = get(0, 0, width, height);
+    image(a, 0, 0);
+    filter(BLUR, 10-frameCount)
+    
 }
