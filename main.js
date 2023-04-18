@@ -109,14 +109,11 @@ class Ray {
             let normal = c[2];
             let material = collision[1];
             let lightStrength = 1;
-            // if (material.specular) {
+
             let incoming_ray = this.dir.copy();
             let dot_product = incoming_ray.dot(normal);
             let scaled_normal = p5.Vector.mult(normal, 2 * dot_product);
             let specularRay = p5.Vector.sub(incoming_ray, scaled_normal).normalize();
-            // this.dir.set(p5.Vector.sub(incoming_ray, scaled_normal));
-            // this.dir.normalize();
-            // } else {
             let randomDir;
             do {
             randomDir = randomPointOnUnitSphere();
@@ -125,10 +122,6 @@ class Ray {
             let refractedRay = randomDir.normalize();
             
             this.dir.set(lerp(specularRay.x, refractedRay.x, material.smoothness), lerp(specularRay.y, refractedRay.y, material.smoothness), lerp(specularRay.z, refractedRay.z, material.smoothness));
-            // this.dir.set(randomDir);
-            // this.dir.normalize();
-            // }
-            
             let emitted = p5.Vector.mult(material.emitColor, material.strength);
             light.add(p5.Vector.mult(emitted, rayColor));
             rayColor.mult(material.color);
@@ -153,9 +146,13 @@ function drawWall(x, y, z, w, h, objects) {
     objects.push(new Triangle(x, y, z, x, y+h, z, x+w, y+h, z, [0, 0, 255], [0,0,255], 0, 1));
 }
 
-let p = 0;
+let shaderObj;
+function preload() {
+    shaderObj = loadShader('fragShader.glsl')
+}
+
 function setup() {
-    createCanvas(200, 200);
+    createCanvas(200, 200, WEBGL);
     pixelDensity(1);
     accumulatedColors = new Array(width * height * 3).fill(0);
     samplesPerPixel = new Array(width * height).fill(0);
@@ -163,17 +160,7 @@ function setup() {
     objects.push(new Sphere(-0.5, -1.25, 10000-3, 1.5, [255,0,255], [255, 0, 255], 0, 1));
 
     objects.push(new Sphere(-1.6, 0.6, 10000-4, 1, [255,0,0], [255, 0, 0], 0, 1));
-    // objects.push(new Sphere(0.5, 0.5, 10000, 0.5, [0,255,0], [0, 0, 0], 0, 1));
-    // objects.push(new Sphere(1.5, 0.5, 10000, 0.5, [0,255,0], [0, 0, 0], 0, 1));
-    let z = 10000+5;
-    // let scale = 1;
-    // objects.push(new Triangle(0, 0, z+1, 1, 1, z, -1, 0, z, [255, 0, 0], [255,255,255], 1, false));
-    // drawWall(-5, -5, z, 10, 10, objects);
     objects.push(new Sphere(0, 9, 10000-5, 5, [0,0,0], [255, 255, 255], 6, 1));
- 
-//   objects.push(new Sphere(-2, -2, 10000, 0.8, [0,255,255], [255, 255, 0], 1, false));
-//   objects.push(new Sphere(1, 2, 10000, 0.8, [255,255,255], [255, 0, 0], 4, false));
-//   objects.push(new Sphere(1, -2, 10000, 1, [255,255,255], [255, 0, 0], 0, true));
 }
 
 function draw() {
@@ -196,14 +183,10 @@ function draw() {
             let cameraY = screenY * Math.tan(fov / 2 * Math.PI / 180);
  
             let rayDir = createVector(cameraX, cameraY, -focalLength);
-            // rayDir.add(cameraPos);
-            // rayDir.rotate(cameraDir);
+
             rayDir.sub(cameraPos);
             rayDir.normalize();
-            // let rayDir = createVector(cameraX, cameraY, -focalLength);
-            // rayDir.sub(cameraPos);
-            // rayDir.normalize();
-        
+
             var ray = new Ray(cameraPos.x, cameraPos.y, cameraPos.z, rayDir.x, rayDir.y, rayDir.z);
             var clr = ray.trace(objects);
             let index = x + y * width;
@@ -222,9 +205,10 @@ function draw() {
         }
     }
     updatePixels();
-    smooth();
-    let a = get(0, 0, width, height);
-    image(a, 0, 0);
-    filter(BLUR, 10-frameCount)
+    // smooth();
+    shader(shaderObj);
+    // let a = get(0, 0, width, height);
+    // image(a, 0, 0);
+    // filter(BLUR, 10-frameCount)
     
 }
