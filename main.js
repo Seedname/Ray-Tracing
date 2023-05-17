@@ -146,13 +146,8 @@ function drawWall(x, y, z, w, h, objects) {
     objects.push(new Triangle(x, y, z, x, y+h, z, x+w, y+h, z, [0, 0, 255], [0,0,255], 0, 1));
 }
 
-let shaderObj;
-function preload() {
-    shaderObj = loadShader('fragShader.glsl')
-}
-
 function setup() {
-    createCanvas(200, 200, WEBGL);
+    createCanvas(400, 400);
     pixelDensity(1);
     accumulatedColors = new Array(width * height * 3).fill(0);
     samplesPerPixel = new Array(width * height).fill(0);
@@ -205,10 +200,8 @@ function draw() {
         }
     }
     updatePixels();
-    // smooth();
-    shader(shaderObj);
-    // let a = get(0, 0, width, height);
-    // image(a, 0, 0);
-    // filter(BLUR, 10-frameCount)
+    let a = get(0, 0, width, height);
+    image(a, 0, 0);
+    filter(BLUR, 10-frameCount)
     
 }
